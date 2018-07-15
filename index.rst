@@ -67,33 +67,29 @@ Beginner Tutorials
 Intermediate Tutorials
 ----------------------
 
-RNNs for NLP
-^^^^^^^^^^^^
-
-Applying recurrent neural networks to natural language tasks, from
-classification to generation.
-
-
 .. galleryitem:: intermediate/char_rnn_classification_tutorial.py
+
 .. galleryitem:: intermediate/char_rnn_generation_tutorial.py
   :figure: _static/img/char_rnn_generation.png
+
 .. galleryitem:: intermediate/seq2seq_translation_tutorial.py
   :figure: _static/img/seq2seq_flat.png
-
-.. raw:: html
-
-    <div style='clear:both'></div>
-
-Reinforcement Learning
-^^^^^^^^^^^^^^^^^^^^^^
 
 .. galleryitem:: intermediate/reinforcement_q_learning.py
     :figure: _static/img/cartpole.gif
 
+.. customgalleryitem::
+   :tooltip: Writing Distributed Applications with PyTorch.
+   :description: :doc:`/intermediate/dist_tuto`
+   :figure: _static/img/distributed/DistPyTorch.jpg
+
+
+.. galleryitem:: intermediate/spatial_transformer_tutorial.py
+
+
 .. raw:: html
 
     <div style='clear:both'></div>
-
 
 .. toctree::
    :maxdepth: 2
@@ -105,20 +101,24 @@ Reinforcement Learning
    intermediate/char_rnn_generation_tutorial
    intermediate/seq2seq_translation_tutorial
    intermediate/reinforcement_q_learning
+   intermediate/dist_tuto
+   intermediate/spatial_transformer_tutorial
+
 
 Advanced Tutorials
 ------------------
 
 .. galleryitem:: advanced/neural_style_tutorial.py
-    :intro: This tutorial explains how to impletment the Neural-Style algorithm developed by Leon A. Gatys, Alexander S. Ecker and Matthias Bethge.
+    :intro: This tutorial explains how to implement the Neural-Style algorithm developed by Leon A. Gatys, Alexander S. Ecker and Matthias Bethge.
 
 .. galleryitem:: advanced/numpy_extensions_tutorial.py
 
 .. galleryitem:: advanced/super_resolution_with_caffe2.py
 
 .. customgalleryitem::
-   :tooltip: Implement custom extensions in C.
-   :description: :doc:`/advanced/c_extension`
+   :tooltip: Implement custom extensions in C++ or CUDA.
+   :description: :doc:`/advanced/cpp_extension`
+   :figure: _static/img/cpp_logo.png
 
 
 .. raw:: html
@@ -135,4 +135,4 @@ Advanced Tutorials
    advanced/neural_style_tutorial
    advanced/numpy_extensions_tutorial
    advanced/super_resolution_with_caffe2
-   advanced/c_extension
+   advanced/cpp_extension

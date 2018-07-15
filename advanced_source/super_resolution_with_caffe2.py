@@ -2,31 +2,27 @@
 Transfering a model from PyTorch to Caffe2 and Mobile using ONNX
 ================================================================
 
+In this tutorial, we describe how to use ONNX to convert a model defined
+in PyTorch into the ONNX format and then load it into Caffe2. Once in
+Caffe2, we can run the model to double-check it was exported correctly,
+and we then show how to use Caffe2 features such as mobile exporter for
+executing the model on mobile devices.
+
+For this tutorial, you will need to install `onnx <https://github.com/onnx/onnx>`__,
+`onnx-caffe2 <https://github.com/onnx/onnx-caffe2>`__ and `Caffe2 <https://caffe2.ai/>`__.
+You can get binary builds of onnx and onnx-caffe2 with
+``conda install -c ezyang onnx onnx-caffe2``.
+
+``NOTE``: This tutorial needs PyTorch master branch which can be installed by following
+the instructions `here <https://github.com/pytorch/pytorch#from-source>`__
+
 """
-
-
-######################################################################
-# In this tutorial, we describe how to use ONNX to convert a model defined
-# in PyTorch into the ONNX format and then load it into Caffe2. Once in
-# Caffe2, we can run the model to double-check it was exported correctly,
-# and we then show how to use Caffe2 features such as mobile exporter for
-# executing the model on mobile devices.
-#
-# For this tutorial, you will need to install `onnx <https://github.com/onnx/onnx>`__,
-# `onnx-caffe2 <https://github.com/onnx/onnx-caffe2>`__ and `Caffe2 <https://caffe2.ai/>`__.
-# You can get binary builds of onnx and onnx-caffe2 with
-# ``conda install -c ezyang onnx onnx-caffe2``.
-#
-# ``NOTE``: This tutorial needs PyTorch master branch which can installed by following
-# the instructions `here <https://github.com/pytorch/pytorch#from-source>`__
-#
 
 # Some standard imports
 import io
 import numpy as np
 
 from torch import nn
-from torch.autograd import Variable
 import torch.utils.model_zoo as model_zoo
 import torch.onnx
 
@@ -68,10 +64,10 @@ class SuperResolutionNet(nn.Module):
         return x
 
     def _initialize_weights(self):
-        init.orthogonal(self.conv1.weight, init.calculate_gain('relu'))
-        init.orthogonal(self.conv2.weight, init.calculate_gain('relu'))
-        init.orthogonal(self.conv3.weight, init.calculate_gain('relu'))
-        init.orthogonal(self.conv4.weight)
+        init.orthogonal_(self.conv1.weight, init.calculate_gain('relu'))
+        init.orthogonal_(self.conv2.weight, init.calculate_gain('relu'))
+        init.orthogonal_(self.conv3.weight, init.calculate_gain('relu'))
+        init.orthogonal_(self.conv4.weight)
 
 # Create the super-resolution model by using the above model definition.
 torch_model = SuperResolutionNet(upscale_factor=3)
@@ -89,7 +85,10 @@ model_url = 'https://s3.amazonaws.com/pytorch/test_data/export/superres_epoch100
 batch_size = 1    # just a random number
 
 # Initialize model with the pretrained weights
-torch_model.load_state_dict(model_zoo.load_url(model_url))
+map_location = lambda storage, loc: storage
+if torch.cuda.is_available():
+    map_location = None
+torch_model.load_state_dict(model_zoo.load_url(model_url, map_location=map_location))
 
 # set the train mode to false since we will only run the forward pass.
 torch_model.train(False)
@@ -99,7 +98,7 @@ torch_model.train(False)
 # Exporting a model in PyTorch works via tracing. To export a model, you
 # call the ``torch.onnx._export()`` function. This will execute the model,
 # recording a trace of what operators are used to compute the outputs.
-# Because ``export`` runs the model, we need provide an input tensor
+# Because ``_export`` runs the model, we need provide an input tensor
 # ``x``. The values in this tensor are not important; it can be an image
 # or a random tensor as long as it is the right size.
 #
@@ -108,7 +107,7 @@ torch_model.train(False)
 #
 
 # Input to the model
-x = Variable(torch.randn(batch_size, 1, 224, 224), requires_grad=True)
+x = torch.randn(batch_size, 1, 224, 224, requires_grad=True)
 
 # Export the model
 torch_out = torch.onnx._export(torch_model,             # model being run
@@ -131,21 +130,21 @@ torch_out = torch.onnx._export(torch_model,             # model being run
 import onnx
 import onnx_caffe2.backend
 
-# Load the ONNX GraphProto object. Graph is a standard Python protobuf object
-graph = onnx.load("super_resolution.onnx")
+# Load the ONNX ModelProto object. model is a standard Python protobuf object
+model = onnx.load("super_resolution.onnx")
 
-# prepare the caffe2 backend for executing the model this converts the ONNX graph into a
+# prepare the caffe2 backend for executing the model this converts the ONNX model into a
 # Caffe2 NetDef that can execute it. Other ONNX backends, like one for CNTK will be
 # availiable soon.
-prepared_backend = onnx_caffe2.backend.prepare(graph)
+prepared_backend = onnx_caffe2.backend.prepare(model)
 
 # run the model in Caffe2
 
 # Construct a map from input names to Tensor data.
-# The graph itself contains inputs for all weight parameters, followed by the input image.
+# The graph of the model itself contains inputs for all weight parameters, after the input image.
 # Since the weights are already embedded, we just need to pass the input image.
-# last input the grap
-W = {graph.input[-1]: x.data.numpy()}
+# Set the first input.
+W = {model.graph.input[0].name: x.data.numpy()}
 
 # Run the Caffe2 net:
 c2_out = prepared_backend.run(W)[0]
@@ -153,6 +152,7 @@ c2_out = prepared_backend.run(W)[0]
 # Verify the numerical correctness upto 3 decimal places
 np.testing.assert_almost_equal(torch_out.data.cpu().numpy(), c2_out, decimal=3)
 
+print("Exported model has been executed on Caffe2 backend, and the result looks good!")
 
 ######################################################################
 # We should see that the output of PyTorch and Caffe2 runs match
@@ -202,15 +202,15 @@ np.testing.assert_almost_equal(torch_out.data.cpu().numpy(), c2_out, decimal=3)
 # super-resolution model for the rest of this tutorial.
 #
 
-# extract the workspace and the graph proto from the internal representation
+# extract the workspace and the model proto from the internal representation
 c2_workspace = prepared_backend.workspace
-c2_graph = prepared_backend.predict_net
+c2_model = prepared_backend.predict_net
 
 # Now import the caffe2 mobile exporter
 from caffe2.python.predictor import mobile_exporter
 
 # call the Export to get the predict_net, init_net. These nets are needed for running things on mobile
-init_net, predict_net = mobile_exporter.Export(c2_workspace, c2_graph, c2_graph.external_input)
+init_net, predict_net = mobile_exporter.Export(c2_workspace, c2_model, c2_model.external_input)
 
 # Let's also save the init_net and predict_net to a file that we will later use for running them on mobile
 with open('init_net.pb', "wb") as fopen:
